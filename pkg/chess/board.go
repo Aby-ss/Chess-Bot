@@ -6,6 +6,7 @@ import (
     "image/color"
     "log"
     "path/filepath"
+    "strings"
 )
 
 const (
@@ -16,9 +17,10 @@ const (
 )
 
 var (
-    orange    = color.RGBA{255, 165, 0, 255}
-    lightSkin = color.RGBA{255, 228, 196, 255}
+    orange      = color.RGBA{255, 165, 0, 255}
+    lightSkin   = color.RGBA{255, 228, 196, 255}
     pieceImages = make(map[string]*ebiten.Image)
+    FENPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 )
 
 // Load a single image file from assets
@@ -28,26 +30,46 @@ func loadPieceImage(filename string) *ebiten.Image {
         log.Printf("Failed to load image %s: %v", filename, err)
         return nil
     }
-    log.Printf("Loaded image: %s", filename)
     return img
 }
 
 // Initialize all piece images
 func initPieces() {
-    pieceImages["white_king"] = loadPieceImage("white-king.png")
-    pieceImages["white_queen"] = loadPieceImage("white-queen.png")
-    pieceImages["white_rook"] = loadPieceImage("white-rook.png")
-    pieceImages["white_knight"] = loadPieceImage("white-knight.png")
-    pieceImages["white_bishop"] = loadPieceImage("white-bishop.png")
-    pieceImages["white_pawn"] = loadPieceImage("white-pawn.png")
+    pieceImages["K"] = loadPieceImage("white-king.png")
+    pieceImages["Q"] = loadPieceImage("white-queen.png")
+    pieceImages["R"] = loadPieceImage("white-rook.png")
+    pieceImages["N"] = loadPieceImage("white-knight.png")
+    pieceImages["B"] = loadPieceImage("white-bishop.png")
+    pieceImages["P"] = loadPieceImage("white-pawn.png")
 
-    pieceImages["black_king"] = loadPieceImage("black-king.png")
-    pieceImages["black_queen"] = loadPieceImage("black-queen.png")
-    pieceImages["black_rook"] = loadPieceImage("black-rook.png")
-    pieceImages["black_knight"] = loadPieceImage("black-knight.png")
-    pieceImages["black_bishop"] = loadPieceImage("black-bishop.png")
-    pieceImages["black_pawn"] = loadPieceImage("black-pawn.png")
+    pieceImages["k"] = loadPieceImage("black-king.png")
+    pieceImages["q"] = loadPieceImage("black-queen.png")
+    pieceImages["r"] = loadPieceImage("black-rook.png")
+    pieceImages["n"] = loadPieceImage("black-knight.png")
+    pieceImages["b"] = loadPieceImage("black-bishop.png")
+    pieceImages["p"] = loadPieceImage("black-pawn.png")
+}
 
+// Parse FEN notation into a 2D board array
+func parseFEN(fen string) [][]string {
+    board := make([][]string, BoardSize)
+    rows := strings.Split(fen, "/")
+
+    for i, row := range rows {
+        board[i] = make([]string, BoardSize)
+        col := 0
+        for _, char := range row {
+            if char >= '1' && char <= '8' {
+                // Empty squares
+                col += int(char - '0')
+            } else {
+                // Chess piece
+                board[i][col] = string(char)
+                col++
+            }
+        }
+    }
+    return board
 }
 
 // Game structure for Ebiten
@@ -70,9 +92,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
         }
     }
 
-    // Example of drawing pieces at specific squares
-    drawPiece(screen, "white_king", 0, 4)  // Place white king on row 0, col 4
-    drawPiece(screen, "black_queen", 7, 3) // Place black queen on row 7, col 3
+    // Draw pieces from the FEN position
+    board := parseFEN(FENPosition)
+    for row, rowValues := range board {
+        for col, piece := range rowValues {
+            if piece != "" {
+                drawPiece(screen, piece, row, col)
+            }
+        }
+    }
 }
 
 // Function to draw a piece at the center of a specific square
@@ -93,7 +121,6 @@ func drawPiece(screen *ebiten.Image, pieceName string, row, col int) {
     y := float64(row*SquareSize) + (SquareSize-float64(pieceImg.Bounds().Dy())*scale)/2
     options.GeoM.Translate(x, y)
 
-    log.Printf("Drawing %s at row %d, col %d", pieceName, row, col)
     screen.DrawImage(pieceImg, options)
 }
 
