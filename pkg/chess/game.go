@@ -22,9 +22,14 @@ var (
 	lightSkin   = color.RGBA{255, 228, 196, 255}
 	pieceImages = make(map[string]*ebiten.Image)
 	FENPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+	board       = parseFEN(FENPosition)
+
+	selectedPiece string
+	selectedRow   int
+	selectedCol   int
+	isDragging    bool
 )
 
-// Load a single image file from assets
 func loadPieceImage(filename string) *ebiten.Image {
 	img, _, err := ebitenutil.NewImageFromFile(filepath.Join("assets", filename))
 	if err != nil {
@@ -34,7 +39,6 @@ func loadPieceImage(filename string) *ebiten.Image {
 	return img
 }
 
-// Initialize all piece images
 func initPieces() {
 	pieceImages["K"] = loadPieceImage("white-king.png")
 	pieceImages["Q"] = loadPieceImage("white-queen.png")
@@ -42,7 +46,6 @@ func initPieces() {
 	pieceImages["N"] = loadPieceImage("white-knight.png")
 	pieceImages["B"] = loadPieceImage("white-bishop.png")
 	pieceImages["P"] = loadPieceImage("white-pawn.png")
-
 	pieceImages["k"] = loadPieceImage("black-king.png")
 	pieceImages["q"] = loadPieceImage("black-queen.png")
 	pieceImages["r"] = loadPieceImage("black-rook.png")
@@ -51,7 +54,6 @@ func initPieces() {
 	pieceImages["p"] = loadPieceImage("black-pawn.png")
 }
 
-// Parse FEN notation into a 2D board array
 func parseFEN(fen string) [][]string {
 	board := make([][]string, BoardSize)
 	rows := strings.Split(fen, "/")
@@ -61,10 +63,8 @@ func parseFEN(fen string) [][]string {
 		col := 0
 		for _, char := range row {
 			if char >= '1' && char <= '8' {
-				// Empty squares
 				col += int(char - '0')
 			} else {
-				// Chess piece
 				board[i][col] = string(char)
 				col++
 			}
@@ -73,12 +73,9 @@ func parseFEN(fen string) [][]string {
 	return board
 }
 
-// Game structure for Ebiten
 type Game struct{}
 
-// Draw the chessboard and pieces
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Draw the chessboard squares
 	for row := 0; row < BoardSize; row++ {
 		for col := 0; col < BoardSize; col++ {
 			var squareColor color.Color
@@ -93,31 +90,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// Draw pieces from the FEN position
-	board := parseFEN(FENPosition)
 	for row, rowValues := range board {
 		for col, piece := range rowValues {
-			if piece != "" {
+			if piece != "" && !(isDragging && row == selectedRow && col == selectedCol) {
 				drawPiece(screen, piece, row, col)
 			}
 		}
 	}
+
+	if isDragging && selectedPiece != "" {
+		x, y := ebiten.CursorPosition()
+		drawPieceAt(screen, selectedPiece, x, y)
+	}
 }
 
-// Function to draw a piece at the center of a specific square
 func drawPiece(screen *ebiten.Image, pieceName string, row, col int) {
 	pieceImg := pieceImages[pieceName]
 	if pieceImg == nil {
-		log.Printf("Image for piece %s not found", pieceName)
+		log.Printf("Image for piece %s not found ❌", pieceName)
 		return
 	}
 
-	// Scale the image to fit within the square size
 	scale := float64(SquareSize) / float64(pieceImg.Bounds().Dx())
 	options := &ebiten.DrawImageOptions{}
 	options.GeoM.Scale(scale, scale)
 
-	// Calculate centered position within the square
 	x := float64(col*SquareSize) + (SquareSize-float64(pieceImg.Bounds().Dx())*scale)/2
 	y := float64(row*SquareSize) + (SquareSize-float64(pieceImg.Bounds().Dy())*scale)/2
 	options.GeoM.Translate(x, y)
@@ -125,24 +122,52 @@ func drawPiece(screen *ebiten.Image, pieceName string, row, col int) {
 	screen.DrawImage(pieceImg, options)
 }
 
-// Update function for Ebiten (unused here)
+func drawPieceAt(screen *ebiten.Image, pieceName string, x, y int) {
+	pieceImg := pieceImages[pieceName]
+	if pieceImg == nil {
+		return
+	}
+
+	scale := float64(SquareSize) / float64(pieceImg.Bounds().Dx())
+	options := &ebiten.DrawImageOptions{}
+	options.GeoM.Scale(scale, scale)
+	options.GeoM.Translate(float64(x)-float64(SquareSize)/2, float64(y)-float64(SquareSize)/2)
+	screen.DrawImage(pieceImg, options)
+}
+
 func (g *Game) Update() error {
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+		x, y := ebiten.CursorPosition()
+		col, row := x/SquareSize, y/SquareSize
+
+		if !isDragging && board[row][col] != "" {
+			selectedPiece = board[row][col]
+			selectedRow, selectedCol = row, col
+			board[row][col] = ""
+			isDragging = true
+		}
+	} else if isDragging {
+		x, y := ebiten.CursorPosition()
+		col, row := x/SquareSize, y/SquareSize
+
+		board[row][col] = selectedPiece
+		isDragging = false
+		selectedPiece = ""
+	}
 	return nil
 }
 
-// Layout function to set screen dimensions
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return ScreenWidth, ScreenHeight
 }
 
 func main() {
-	initPieces() // Load all pieces
+	initPieces()
 
 	game := &Game{}
 	ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
-	ebiten.SetWindowTitle("Chessboard with Pieces")
+	ebiten.SetWindowTitle("Chess Beta Version 0.1.2")
 
-	// Start the game loop
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
 	}
