@@ -80,6 +80,7 @@ type Game struct {
 	selectedRow   int
 	selectedCol   int
 	isDragging    bool
+	currentTurn   string
 }
 
 // Draw the chessboard and pieces
@@ -138,16 +139,18 @@ func drawPieceAtPosition(screen *ebiten.Image, pieceName string, x, y float64) {
 	screen.DrawImage(pieceImg, options)
 }
 
-// Update function to handle dragging and dropping of pieces
 func (g *Game) Update() error {
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
 		col, row := x/SquareSize, y/SquareSize
 
 		if !g.isDragging {
-			g.selectedPiece = g.board[row][col]
-			if g.selectedPiece != "" {
-				g.selectedRow, g.selectedCol = row, col
+			// Select a piece only if it matches the current turn
+			selectedPiece := g.board[row][col]
+			if selectedPiece != "" && g.isPieceTurn(selectedPiece) {
+				g.selectedPiece = selectedPiece
+				g.selectedRow = row
+				g.selectedCol = col
 				g.isDragging = true
 			}
 		}
@@ -155,15 +158,36 @@ func (g *Game) Update() error {
 		x, y := ebiten.CursorPosition()
 		col, row := x/SquareSize, y/SquareSize
 
-		// Complete the move if mouse is released on a valid square
+		// Try to complete the move
 		if g.isValidMove(g.selectedRow, g.selectedCol, row, col) {
 			g.board[row][col] = g.selectedPiece
 			g.board[g.selectedRow][g.selectedCol] = ""
+
+			// Switch the turn after a valid move
+			g.switchTurn()
 		}
+		// Reset selection state
 		g.isDragging = false
 		g.selectedPiece = ""
 	}
 	return nil
+}
+
+// Check if the piece belongs to the current turn
+func (g *Game) isPieceTurn(piece string) bool {
+	if g.currentTurn == "white" {
+		return piece >= "A" && piece <= "Z" // Uppercase pieces for white
+	}
+	return piece >= "a" && piece <= "z" // Lowercase pieces for black
+}
+
+// Switch the turn to the other player
+func (g *Game) switchTurn() {
+	if g.currentTurn == "white" {
+		g.currentTurn = "black"
+	} else {
+		g.currentTurn = "white"
+	}
 }
 
 // Move validation with basic piece movement rules
@@ -205,10 +229,13 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func main() {
 	initPieces()
-	game := &Game{board: parseFEN(FENPosition)}
+	game := &Game{
+		board:       parseFEN(FENPosition),
+		currentTurn: "white", // White moves first
+	}
 
 	ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
-	ebiten.SetWindowTitle("Chessboard with Drag-and-Drop Pieces")
+	ebiten.SetWindowTitle("Chessboard with Turn-Based Logic")
 
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
