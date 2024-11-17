@@ -80,7 +80,8 @@ type Game struct {
 	selectedRow   int
 	selectedCol   int
 	isDragging    bool
-	currentTurn   string
+	currentTurn   string   // "white" or "black"
+	moveLog       []string // Log of moves
 }
 
 // Draw the chessboard and pieces
@@ -163,6 +164,9 @@ func (g *Game) Update() error {
 			g.board[row][col] = g.selectedPiece
 			g.board[g.selectedRow][g.selectedCol] = ""
 
+			// Log the move
+			g.logMove(g.selectedPiece, g.selectedRow, g.selectedCol, row, col)
+
 			// Switch the turn after a valid move
 			g.switchTurn()
 		}
@@ -171,6 +175,27 @@ func (g *Game) Update() error {
 		g.selectedPiece = ""
 	}
 	return nil
+}
+
+// Log a move in algebraic notation
+func (g *Game) logMove(piece string, fromRow, fromCol, toRow, toCol int) {
+	move := g.getAlgebraicNotation(piece, fromRow, fromCol, toRow, toCol)
+	g.moveLog = append(g.moveLog, move)
+	log.Println(move) // Print the move to the console
+}
+
+// Convert a move to algebraic notation (e.g., e2 to e4)
+func (g *Game) getAlgebraicNotation(piece string, fromRow, fromCol, toRow, toCol int) string {
+	from := g.getSquareName(fromRow, fromCol)
+	to := g.getSquareName(toRow, toCol)
+	return piece + ": " + from + " -> " + to
+}
+
+// Convert board coordinates to square names (e.g., 0,0 -> "a8")
+func (g *Game) getSquareName(row, col int) string {
+	file := string('a' + col) // Column as a letter
+	rank := string('8' - row) // Row as a number
+	return file + rank
 }
 
 // Check if the piece belongs to the current turn
@@ -227,15 +252,17 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return ScreenWidth, ScreenHeight
 }
 
+// Initialize the game state
 func main() {
 	initPieces()
 	game := &Game{
 		board:       parseFEN(FENPosition),
 		currentTurn: "white", // White moves first
+		moveLog:     []string{},
 	}
 
 	ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
-	ebiten.SetWindowTitle("Chessboard with Turn-Based Logic")
+	ebiten.SetWindowTitle("Chessboard with Move Logging")
 
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
